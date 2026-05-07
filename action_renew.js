@@ -251,13 +251,13 @@ function getUsers() {
                 const password = String(entry.password || '').trim();
 
                 if (!username || !password) {
-                    console.log(`[用户配置] 跳过无效条目: username/password 不完整 (${maskUsernameForLog(username)})`);
+                    console.log('[用户配置] 跳过无效条目: username/password 不完整。');
                     continue;
                 }
 
                 const dedupeKey = username.toLowerCase();
                 if (seenUsernames.has(dedupeKey)) {
-                    console.log(`[用户配置] 跳过重复账号: ${maskUsernameForLog(username)}`);
+                    console.log('[用户配置] 跳过重复账号。');
                     continue;
                 }
 
@@ -265,10 +265,7 @@ function getUsers() {
                 users.push({ username, password, server_id: String(entry.server_id || '').trim() });
             }
 
-            console.log(`[用户配置] USERS_JSON 原始条目 ${rawUsers.length}，有效用户 ${users.length}`);
-            if (users.length > 0) {
-                console.log(`[用户配置] 本次执行账号: ${users.map((user) => maskUsernameForLog(user.username)).join(', ')}`);
-            }
+            console.log(`[用户配置] 有效用户 ${users.length} 个`);
 
             return users;
         }
@@ -753,7 +750,7 @@ async function solveAltchaIfPresent(page, stageName = "Renew阶段", maxAttempts
                         console.error(`   >> ❌ 登录失败: 账号或密码错误`);
                         const failPhotoDir = path.join(process.cwd(), 'screenshots');
                         if (!fs.existsSync(failPhotoDir)) fs.mkdirSync(failPhotoDir, { recursive: true });
-                        const failSafe = user.username.replace(/[^a-z0-9]/gi, '_');
+                        const failSafe = `user_${i + 1}`;
                         const failScreenshot = path.join(failPhotoDir, `${failSafe}_login_fail.png`);
                         try { await saveViewportScreenshot(page, failScreenshot); } catch (e) {}
                         await sendTelegramMessage(`❌ *${escapeMarkdown(user.username)}*\n登录失败: 账号或密码错误`, failScreenshot);
@@ -835,7 +832,7 @@ async function solveAltchaIfPresent(page, stageName = "Renew阶段", maxAttempts
                         
                         const photoDir = path.join(process.cwd(), 'screenshots');
                         if (!fs.existsSync(photoDir)) fs.mkdirSync(photoDir, { recursive: true });
-                        const safeUsername = user.username.replace(/[^a-z0-9]/gi, '_');
+                        const safeUsername = `user_${i + 1}`;
                         const captchaScreenshotName = `${safeUsername}_ALTCHA_${attempt}.png`;
                         try {
                             await saveViewportScreenshot(page, path.join(photoDir, captchaScreenshotName));
@@ -954,7 +951,7 @@ async function solveAltchaIfPresent(page, stageName = "Renew阶段", maxAttempts
                 console.log('   >> ❌ Renew 全部尝试失败。');
                 const failDir = path.join(process.cwd(), 'screenshots');
                 if (!fs.existsSync(failDir)) fs.mkdirSync(failDir, { recursive: true });
-                const failSafe = user.username.replace(/[^a-z0-9]/gi, '_');
+                const failSafe = `user_${i + 1}`;
                 const failScreenshot = path.join(failDir, `${failSafe}_renew_fail.png`);
                 try { await saveViewportScreenshot(page, failScreenshot); } catch (e) {}
                 await sendTelegramMessage(`❌ *${escapeMarkdown(user.username)}*\n${renewFailureReason}`, failScreenshot);
@@ -966,7 +963,7 @@ async function solveAltchaIfPresent(page, stageName = "Renew阶段", maxAttempts
 
         const photoDir = path.join(process.cwd(), 'screenshots');
         if (!fs.existsSync(photoDir)) fs.mkdirSync(photoDir, { recursive: true });
-        const safeUsername = user.username.replace(/[^a-z0-9]/gi, '_');
+        const safeUsername = `user_${i + 1}`;
         try {
             await saveViewportScreenshot(page, path.join(photoDir, `${safeUsername}.png`));
         } catch (e) {}
