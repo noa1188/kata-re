@@ -319,6 +319,29 @@ def wait_for_altcha(sb, timeout=30) -> bool:
   return false;
 })()
 """)
+            print(f"  🔍 ALTCHA 状态 [{i//2}s]: {debug}")
+
+            done = sb.execute_script("""
+(function(){
+  var input = document.querySelector('input[name="altcha"]');
+  if (input && input.value && input.value.length > 10) return true;
+  var modal = document.querySelector('#renew-modal');
+  if (modal) {
+    var modalInput = modal.querySelector('input[name="altcha"]');
+    if (modalInput && modalInput.value && modalInput.value.length > 10) return true;
+  }
+  var widget = document.querySelector('altcha-widget');
+  if (widget) {
+    if (widget.getAttribute('verified') === 'true') return true;
+    if (widget.classList.contains('verified')) return true;
+    try {
+      var shadow = widget.shadowRoot;
+      if (shadow && shadow.querySelector('.verified')) return true;
+    } catch(e) {}
+  }
+  return false;
+})()
+""")
             if done:
                 print("✅ ALTCHA 验证完成")
                 return True
