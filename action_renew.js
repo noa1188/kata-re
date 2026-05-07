@@ -649,13 +649,12 @@ async function solveAltchaIfPresent(page, stageName = "Renew阶段", maxAttempts
 
     // ── 日志掩码：屏蔽所有敏感信息 ──────────────────────────────────
     for (const user of users) {
-      if (user.username)  console.log(`::add-mask::${user.username}`);
-      if (user.password)  console.log(`::add-mask::${user.password}`);
-      if (user.server_id) console.log(`::add-mask::${user.server_id}`);
+        if (user.username)  console.log(`::add-mask::${user.username}`);
+        if (user.password)  console.log(`::add-mask::${user.password}`);
+        if (user.server_id) console.log(`::add-mask::${user.server_id}`);
     }
     if (TG_BOT_TOKEN) console.log(`::add-mask::${TG_BOT_TOKEN}`);
     if (TG_CHAT_ID)   console.log(`::add-mask::${TG_CHAT_ID}`);
-    if (TG_BOT)       console.log(`::add-mask::${TG_BOT}`);
 
     if (PROXY_CONFIG) {
         if (!await checkProxy()) process.exit(1);
