@@ -333,7 +333,7 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
             time.sleep(2)
 
             print(f"[-] {tag} 等待 Turnstile...")
-            for _ in range(20):
+            for _ in range(40):
                 if turnstile_exists(sb):
                     print(f"✅ {tag} 检测到 Turnstile")
                     break
