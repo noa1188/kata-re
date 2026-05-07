@@ -263,34 +263,6 @@ def altcha_exists(sb) -> bool:
     except Exception:
         return False
 
-# 临时调试代码，加在 altcha_exists 判断之后、wait_for_altcha 之前
-if altcha_exists(sb):
-    print(f"[-] {tag} 检测到 ALTCHA，打印坐标信息...")
-    # 打印 ALTCHA 相关元素的位置
-    coords_info = sb.execute_script("""
-(function(){
-  var results = [];
-  // 检测 altcha-widget
-  var widget = document.querySelector('altcha-widget');
-  if (widget) {
-    var r = widget.getBoundingClientRect();
-    results.push('altcha-widget: x=' + Math.round(r.x) + ' y=' + Math.round(r.y) + ' w=' + Math.round(r.width) + ' h=' + Math.round(r.height));
-  }
-  // 检测弹窗内所有按钮
-  var modal = document.querySelector('#renew-modal');
-  if (modal) {
-    var btns = modal.querySelectorAll('button');
-    btns.forEach(function(btn, i) {
-      var r = btn.getBoundingClientRect();
-      results.push('modal-btn[' + i + '] text="' + btn.textContent.trim().substring(0,20) + '" x=' + Math.round(r.x) + ' y=' + Math.round(r.y));
-    });
-  }
-  return results.join(' | ');
-})()
-""")
-    print(f"  📐 ALTCHA 元素信息: {coords_info}")
-    sb.save_screenshot(f"altcha_debug_{idx}.png")
-
 def wait_for_altcha(sb, timeout=30) -> bool:
     """等待 ALTCHA 后台自动完成（无需点击）"""
     print(f"  ⏳ 等待 ALTCHA 自动验证（最多 {timeout} 秒）...")
@@ -439,6 +411,31 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
             sb.click(renew_btn)
             print(f"✅ {tag} 已点击 Renew 按钮，等待弹窗...")
             time.sleep(2)
+
+            # ✅ 调试代码放在这里 ↓↓↓
+            print(f"[-] {tag} 检测到 ALTCHA，打印坐标信息...")
+            coords_info = sb.execute_script("""
+(function(){
+  var results = [];
+  var widget = document.querySelector('altcha-widget');
+  if (widget) {
+    var r = widget.getBoundingClientRect();
+    results.push('altcha-widget: x=' + Math.round(r.x) + ' y=' + Math.round(r.y) + ' w=' + Math.round(r.width) + ' h=' + Math.round(r.height));
+  }
+  var modal = document.querySelector('#renew-modal');
+  if (modal) {
+    var btns = modal.querySelectorAll('button');
+    btns.forEach(function(btn, i) {
+      var r = btn.getBoundingClientRect();
+      results.push('modal-btn[' + i + '] text="' + btn.textContent.trim().substring(0,20) + '" x=' + Math.round(r.x) + ' y=' + Math.round(r.y));
+    });
+  }
+  return results.join(' | ');
+})()
+""")
+            print(f"  📐 ALTCHA 元素信息: {coords_info}")
+            sb.save_screenshot(f"altcha_debug_{idx}.png")
+            # ✅ 调试代码到这里结束 ↑↑↑
 
             # ── 续期弹窗使用 ALTCHA（后台自动验证，无需点击）────────────
             print(f"[-] {tag} 检测续期弹窗验证方式...")
