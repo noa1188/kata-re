@@ -27,17 +27,16 @@ for _line in os.getenv("KATABUMP_ACCOUNT", "").strip().splitlines():
             "server_id": _parts[2],
         })
 
-TG_BOT     = os.getenv("TG_BOT", "")
-LOCAL_PROXY = "http://127.0.0.1:8080"  # WARP SOCKS5 经 GOST 转换后的 HTTP 代理
+TG_BOT      = os.getenv("TG_BOT", "")
+LOCAL_PROXY = "http://127.0.0.1:8080"
 
 # ==============================================================================
-# 日志掩码：隐藏 GitHub Actions 日志中的敏感信息
+# 日志掩码
 # ==============================================================================
 for _a in ACCOUNTS:
     for _v in _a.values():
         if _v:
             print(f"::add-mask::{_v}", flush=True)
-    # 掩码完整的 TARGET_URL
     _url = f"https://dashboard.katabump.com/servers/edit?id={_a['server_id']}"
     print(f"::add-mask::{_url}", flush=True)
 
@@ -59,7 +58,7 @@ def send_tg(msg: str):
         pass
 
 # ==============================================================================
-# Turnstile 工具函数
+# Turnstile 工具函数（用于登录页）
 # ==============================================================================
 EXPAND_POPUP_JS = r"""
 (function() {
@@ -179,7 +178,7 @@ def get_window_offset(sb):
     except Exception:
         return 0, 0, 87
 
-def check_token(sb) -> bool:
+def check_turnstile_token(sb) -> bool:
     try:
         return sb.execute_script("""
 (function(){
@@ -192,13 +191,11 @@ def check_token(sb) -> bool:
 
 def turnstile_exists(sb) -> bool:
     try:
-        # 先检测主页面
         found = sb.execute_script(
             '(function(){ return document.querySelector(\'input[name="cf-turnstile-response"]\') !== null; })()'
         )
         if found:
             return True
-        # 再检测所有 iframe 内部 + Turnstile 特征 iframe
         found = sb.execute_script("""
 (function(){
   var iframes = document.querySelectorAll('iframe');
@@ -221,7 +218,7 @@ def solve_turnstile(sb) -> bool:
     for _ in range(3):
         sb.execute_script(EXPAND_POPUP_JS)
         time.sleep(0.5)
-    if check_token(sb):
+    if check_turnstile_token(sb):
         print("✅ Turnstile 已通过（无需点击）")
         return True
     coords = get_turnstile_coords(sb)
@@ -235,11 +232,75 @@ def solve_turnstile(sb) -> bool:
     xdotool_click(abs_x, abs_y)
     for _ in range(30):
         time.sleep(0.5)
-        if check_token(sb):
+        if check_turnstile_token(sb):
             print("✅ Turnstile 验证通过")
             return True
     print("❌ Turnstile 验证超时")
     sb.save_screenshot("turnstile_fail.png")
+    return False
+
+# ==============================================================================
+# ALTCHA 工具函数（用于续期弹窗）
+# ALTCHA 是后台自动完成的工作量证明，无需用户点击
+# ==============================================================================
+def altcha_exists(sb) -> bool:
+    """检测页面或弹窗内是否有 ALTCHA 组件"""
+    try:
+        return sb.execute_script("""
+(function(){
+  if (document.querySelector('altcha-widget')) return true;
+  if (document.querySelector('input[name="altcha"]')) return true;
+  if (document.querySelector('[data-altcha]')) return true;
+  // 检测弹窗内
+  var modal = document.querySelector('#renew-modal');
+  if (modal) {
+    if (modal.querySelector('altcha-widget')) return true;
+    if (modal.querySelector('input[name="altcha"]')) return true;
+  }
+  return false;
+})()
+""")
+    except Exception:
+        return False
+
+def wait_for_altcha(sb, timeout=30) -> bool:
+    """等待 ALTCHA 后台自动完成（无需点击）"""
+    print(f"  ⏳ 等待 ALTCHA 自动验证（最多 {timeout} 秒）...")
+    for _ in range(timeout * 2):
+        try:
+            done = sb.execute_script("""
+(function(){
+  // 检测 altcha 隐藏字段是否已有值
+  var input = document.querySelector('input[name="altcha"]');
+  if (input && input.value && input.value.length > 10) return true;
+  // 检测弹窗内
+  var modal = document.querySelector('#renew-modal');
+  if (modal) {
+    var modalInput = modal.querySelector('input[name="altcha"]');
+    if (modalInput && modalInput.value && modalInput.value.length > 10) return true;
+  }
+  // 检测 altcha-widget 的验证完成状态
+  var widget = document.querySelector('altcha-widget');
+  if (widget) {
+    if (widget.getAttribute('verified') === 'true') return true;
+    if (widget.classList.contains('verified')) return true;
+    // 检测 shadowRoot 内的状态
+    try {
+      var shadow = widget.shadowRoot;
+      if (shadow && shadow.querySelector('.verified')) return true;
+    } catch(e) {}
+  }
+  return false;
+})()
+""")
+            if done:
+                print("✅ ALTCHA 验证自动完成")
+                return True
+        except Exception:
+            pass
+        time.sleep(0.5)
+    print(f"❌ ALTCHA 验证超时（{timeout} 秒内未完成）")
+    sb.save_screenshot("altcha_timeout.png")
     return False
 
 # ==============================================================================
@@ -257,7 +318,7 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
         except Exception:
             print(f"⚠️ {tag} IP 验证超时，跳过")
 
-        # 登录
+        # 登录（使用 Turnstile）
         print(f"[-] {tag} 访问登录页...")
         sb.uc_open_with_reconnect("https://dashboard.katabump.com/auth/login", reconnect_time=4)
         time.sleep(3)
@@ -351,22 +412,18 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
             print(f"✅ {tag} 已点击 Renew 按钮，等待弹窗...")
             time.sleep(2)
 
-            print(f"[-] {tag} 等待 Turnstile...")
-            for _ in range(20):
-                if turnstile_exists(sb):
-                    print(f"✅ {tag} 检测到 Turnstile")
-                    break
-                time.sleep(1)
+            # ── 续期弹窗使用 ALTCHA（后台自动验证，无需点击）────────────
+            print(f"[-] {tag} 检测续期弹窗验证方式...")
+            if altcha_exists(sb):
+                print(f"[-] {tag} 检测到 ALTCHA，等待后台自动完成...")
+                if not wait_for_altcha(sb, timeout=30):
+                    sb.save_screenshot(f"altcha_fail_{idx}.png")
+                    send_tg(f"❌ 账号 {tag} 续期失败：ALTCHA 验证超时")
+                    return
             else:
-                print(f"❌ {tag} Turnstile 未出现")
-                sb.save_screenshot(f"no_turnstile_{idx}.png")
-                send_tg(f"❌ 账号 {tag} 续期失败：弹窗内 Turnstile 未出现")
-                return
+                print(f"[-] {tag} 未检测到 ALTCHA，直接提交")
 
-            if not solve_turnstile(sb):
-                send_tg(f"❌ 账号 {tag} 续期失败：弹窗 Turnstile 未通过")
-                return
-
+            # 提交续期
             print(f"🎯 {tag} 提交续期...")
             confirm_btn = '#renew-modal button[type="submit"]'
             if not sb.is_element_visible(confirm_btn):
@@ -404,7 +461,7 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
             send_tg(f"❌ 账号 {tag} 续期崩溃: {e}")
 
 # ==============================================================================
-# 主入口：循环处理所有账号
+# 主入口
 # ==============================================================================
 if __name__ == "__main__":
     if not ACCOUNTS:
