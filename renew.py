@@ -58,35 +58,8 @@ def send_tg(msg: str):
         pass
 
 # ==============================================================================
-# Turnstile 工具函数（用于登录页）
+# xdotool 物理点击（Turnstile 和 ALTCHA 共用）
 # ==============================================================================
-EXPAND_POPUP_JS = r"""
-(function() {
-  var turnstileInput = document.querySelector('input[name="cf-turnstile-response"]');
-  if (!turnstileInput) return;
-  var el = turnstileInput;
-  for (var i = 0; i < 20; i++) {
-    el = el.parentElement;
-    if (!el) break;
-    var style = window.getComputedStyle(el);
-    if (style.overflow === 'hidden' || style.overflowX === 'hidden' || style.overflowY === 'hidden') {
-      el.style.overflow = 'visible';
-    }
-    el.style.minWidth = 'max-content';
-  }
-  var iframes = document.querySelectorAll('iframe');
-  iframes.forEach(function(iframe) {
-    if (iframe.src && iframe.src.includes('challenges.cloudflare.com')) {
-      iframe.style.width = '300px';
-      iframe.style.height = '65px';
-      iframe.style.minWidth = '300px';
-      iframe.style.visibility = 'visible';
-      iframe.style.opacity = '1';
-    }
-  });
-})();
-"""
-
 def xdotool_click(x, y):
     x, y = int(x), int(y)
     try:
@@ -105,38 +78,6 @@ def xdotool_click(x, y):
     except Exception as e:
         print(f"  ⚠️ xdotool 点击失败: {e}")
         return False
-
-def get_turnstile_coords(sb):
-    try:
-        return sb.execute_script("""
-(function(){
-  var iframes = document.querySelectorAll('iframe');
-  for (var i = 0; i < iframes.length; i++) {
-    var src = iframes[i].src || '';
-    if (src.includes('cloudflare') || src.includes('turnstile')) {
-      var rect = iframes[i].getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        return { click_x: Math.round(rect.x + 30), click_y: Math.round(rect.y + rect.height / 2) };
-      }
-    }
-  }
-  var input = document.querySelector('input[name="cf-turnstile-response"]');
-  if (input) {
-    var container = input.parentElement;
-    for (var j = 0; j < 5; j++) {
-      if (!container) break;
-      var rect = container.getBoundingClientRect();
-      if (rect.width > 100 && rect.height > 30) {
-        return { click_x: Math.round(rect.x + 30), click_y: Math.round(rect.y + rect.height / 2) };
-      }
-      container = container.parentElement;
-    }
-  }
-  return null;
-})()
-""")
-    except Exception:
-        return None
 
 def get_window_offset(sb):
     try:
@@ -177,6 +118,68 @@ def get_window_offset(sb):
         return info['screenX'], info['screenY'], toolbar
     except Exception:
         return 0, 0, 87
+
+# ==============================================================================
+# Turnstile 工具函数（用于登录页）
+# ==============================================================================
+EXPAND_POPUP_JS = r"""
+(function() {
+  var turnstileInput = document.querySelector('input[name="cf-turnstile-response"]');
+  if (!turnstileInput) return;
+  var el = turnstileInput;
+  for (var i = 0; i < 20; i++) {
+    el = el.parentElement;
+    if (!el) break;
+    var style = window.getComputedStyle(el);
+    if (style.overflow === 'hidden' || style.overflowX === 'hidden' || style.overflowY === 'hidden') {
+      el.style.overflow = 'visible';
+    }
+    el.style.minWidth = 'max-content';
+  }
+  var iframes = document.querySelectorAll('iframe');
+  iframes.forEach(function(iframe) {
+    if (iframe.src && iframe.src.includes('challenges.cloudflare.com')) {
+      iframe.style.width = '300px';
+      iframe.style.height = '65px';
+      iframe.style.minWidth = '300px';
+      iframe.style.visibility = 'visible';
+      iframe.style.opacity = '1';
+    }
+  });
+})();
+"""
+
+def get_turnstile_coords(sb):
+    try:
+        return sb.execute_script("""
+(function(){
+  var iframes = document.querySelectorAll('iframe');
+  for (var i = 0; i < iframes.length; i++) {
+    var src = iframes[i].src || '';
+    if (src.includes('cloudflare') || src.includes('turnstile')) {
+      var rect = iframes[i].getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        return { click_x: Math.round(rect.x + 30), click_y: Math.round(rect.y + rect.height / 2) };
+      }
+    }
+  }
+  var input = document.querySelector('input[name="cf-turnstile-response"]');
+  if (input) {
+    var container = input.parentElement;
+    for (var j = 0; j < 5; j++) {
+      if (!container) break;
+      var rect = container.getBoundingClientRect();
+      if (rect.width > 100 && rect.height > 30) {
+        return { click_x: Math.round(rect.x + 30), click_y: Math.round(rect.y + rect.height / 2) };
+      }
+      container = container.parentElement;
+    }
+  }
+  return null;
+})()
+""")
+    except Exception:
+        return None
 
 def check_turnstile_token(sb) -> bool:
     try:
@@ -241,7 +244,7 @@ def solve_turnstile(sb) -> bool:
 
 # ==============================================================================
 # ALTCHA 工具函数（用于续期弹窗）
-# ALTCHA 是后台自动完成的工作量证明，无需用户点击
+# 流程：点击 checkbox → 触发后台 PoW 计算 → 等待自动完成
 # ==============================================================================
 def altcha_exists(sb) -> bool:
     """检测页面或弹窗内是否有 ALTCHA 组件"""
@@ -251,7 +254,6 @@ def altcha_exists(sb) -> bool:
   if (document.querySelector('altcha-widget')) return true;
   if (document.querySelector('input[name="altcha"]')) return true;
   if (document.querySelector('[data-altcha]')) return true;
-  // 检测弹窗内
   var modal = document.querySelector('#renew-modal');
   if (modal) {
     if (modal.querySelector('altcha-widget')) return true;
@@ -263,28 +265,52 @@ def altcha_exists(sb) -> bool:
     except Exception:
         return False
 
+def click_altcha(sb) -> bool:
+    """物理点击 ALTCHA checkbox，触发后台 PoW 计算"""
+    try:
+        coords = sb.execute_script("""
+(function(){
+  var widget = document.querySelector('altcha-widget');
+  if (widget) {
+    var r = widget.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) {
+      return { click_x: Math.round(r.x + 30), click_y: Math.round(r.y + r.height / 2) };
+    }
+  }
+  return null;
+})()
+""")
+        if not coords:
+            print("❌ 无法获取 ALTCHA 坐标")
+            return False
+        win_x, win_y, toolbar = get_window_offset(sb)
+        abs_x = coords['click_x'] + win_x
+        abs_y = coords['click_y'] + win_y + toolbar
+        print("  🖱️ 点击 ALTCHA checkbox（坐标已掩码）")
+        xdotool_click(abs_x, abs_y)
+        return True
+    except Exception as e:
+        print(f"❌ ALTCHA 点击异常: {e}")
+        return False
+
 def wait_for_altcha(sb, timeout=30) -> bool:
-    """等待 ALTCHA 后台自动完成（无需点击）"""
-    print(f"  ⏳ 等待 ALTCHA 自动验证（最多 {timeout} 秒）...")
+    """等待 ALTCHA 后台 PoW 计算完成"""
+    print(f"  ⏳ 等待 ALTCHA 验证完成（最多 {timeout} 秒）...")
     for _ in range(timeout * 2):
         try:
             done = sb.execute_script("""
 (function(){
-  // 检测 altcha 隐藏字段是否已有值
   var input = document.querySelector('input[name="altcha"]');
   if (input && input.value && input.value.length > 10) return true;
-  // 检测弹窗内
   var modal = document.querySelector('#renew-modal');
   if (modal) {
     var modalInput = modal.querySelector('input[name="altcha"]');
     if (modalInput && modalInput.value && modalInput.value.length > 10) return true;
   }
-  // 检测 altcha-widget 的验证完成状态
   var widget = document.querySelector('altcha-widget');
   if (widget) {
     if (widget.getAttribute('verified') === 'true') return true;
     if (widget.classList.contains('verified')) return true;
-    // 检测 shadowRoot 内的状态
     try {
       var shadow = widget.shadowRoot;
       if (shadow && shadow.querySelector('.verified')) return true;
@@ -294,7 +320,7 @@ def wait_for_altcha(sb, timeout=30) -> bool:
 })()
 """)
             if done:
-                print("✅ ALTCHA 验证自动完成")
+                print("✅ ALTCHA 验证完成")
                 return True
         except Exception:
             pass
@@ -318,7 +344,7 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
         except Exception:
             print(f"⚠️ {tag} IP 验证超时，跳过")
 
-        # 登录（使用 Turnstile）
+        # ── 登录（Turnstile）──────────────────────────────────────────
         print(f"[-] {tag} 访问登录页...")
         sb.uc_open_with_reconnect("https://dashboard.katabump.com/auth/login", reconnect_time=4)
         time.sleep(3)
@@ -371,7 +397,7 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
             send_tg(f"❌ 账号 {tag} 续期失败：登录超时")
             return
 
-        # 跳转服务器页面
+        # ── 跳转服务器页面 ────────────────────────────────────────────
         print(f"[-] {tag} 跳转服务器页面...")
         sb.execute_script(f"window.location.href = '{target_url}';")
         time.sleep(4)
@@ -384,7 +410,7 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
 
         sb.save_screenshot(f"server_page_{idx}.png")
 
-        # 寻找 Renew 按钮
+        # ── 寻找 Renew 按钮 ───────────────────────────────────────────
         print(f"[-] {tag} 寻找 Renew 按钮...")
         renew_btn = None
         for sel in [
@@ -412,35 +438,15 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
             print(f"✅ {tag} 已点击 Renew 按钮，等待弹窗...")
             time.sleep(2)
 
-            # ✅ 调试代码放在这里 ↓↓↓
-            print(f"[-] {tag} 检测到 ALTCHA，打印坐标信息...")
-            coords_info = sb.execute_script("""
-(function(){
-  var results = [];
-  var widget = document.querySelector('altcha-widget');
-  if (widget) {
-    var r = widget.getBoundingClientRect();
-    results.push('altcha-widget: x=' + Math.round(r.x) + ' y=' + Math.round(r.y) + ' w=' + Math.round(r.width) + ' h=' + Math.round(r.height));
-  }
-  var modal = document.querySelector('#renew-modal');
-  if (modal) {
-    var btns = modal.querySelectorAll('button');
-    btns.forEach(function(btn, i) {
-      var r = btn.getBoundingClientRect();
-      results.push('modal-btn[' + i + '] text="' + btn.textContent.trim().substring(0,20) + '" x=' + Math.round(r.x) + ' y=' + Math.round(r.y));
-    });
-  }
-  return results.join(' | ');
-})()
-""")
-            print(f"  📐 ALTCHA 元素信息: {coords_info}")
-            sb.save_screenshot(f"altcha_debug_{idx}.png")
-            # ✅ 调试代码到这里结束 ↑↑↑
-
-            # ── 续期弹窗使用 ALTCHA（后台自动验证，无需点击）────────────
+            # ── 续期弹窗：ALTCHA 点击 + 等待 PoW 完成 ────────────────
             print(f"[-] {tag} 检测续期弹窗验证方式...")
             if altcha_exists(sb):
-                print(f"[-] {tag} 检测到 ALTCHA，等待后台自动完成...")
+                print(f"[-] {tag} 检测到 ALTCHA，点击 checkbox...")
+                if not click_altcha(sb):
+                    sb.save_screenshot(f"altcha_click_fail_{idx}.png")
+                    send_tg(f"❌ 账号 {tag} 续期失败：ALTCHA 点击失败")
+                    return
+                # 点击后等待后台 PoW 计算完成
                 if not wait_for_altcha(sb, timeout=30):
                     sb.save_screenshot(f"altcha_fail_{idx}.png")
                     send_tg(f"❌ 账号 {tag} 续期失败：ALTCHA 验证超时")
@@ -448,7 +454,7 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
             else:
                 print(f"[-] {tag} 未检测到 ALTCHA，直接提交")
 
-            # 提交续期
+            # ── 提交续期 ──────────────────────────────────────────────
             print(f"🎯 {tag} 提交续期...")
             confirm_btn = '#renew-modal button[type="submit"]'
             if not sb.is_element_visible(confirm_btn):
