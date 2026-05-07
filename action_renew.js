@@ -7,7 +7,7 @@ const { spawn, exec } = require('child_process');
 const http = require('http');
 
 const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN;
-const TG_CHAT_ID = process.env.TG_CHAT_ID;
+const TG_CHAT_ID   = process.env.TG_CHAT_ID;
 const GITHUB_EVENT_NAME = process.env.GITHUB_EVENT_NAME || '';
 
 // Anti-detection: scheduled runs get 0-3h random delay; manual runs skip delay
