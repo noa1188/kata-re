@@ -6,12 +6,8 @@ const path = require('path');
 const { spawn, exec } = require('child_process');
 const http = require('http');
 
-// ==============================================================================
-// TG_BOT 格式：bot_token:chat_id（统一为单个 Secret）
-// ==============================================================================
-const TG_BOT       = process.env.TG_BOT || '';
-const TG_BOT_TOKEN = TG_BOT.includes(':') ? TG_BOT.split(':')[0] : (process.env.TG_BOT_TOKEN || '');
-const TG_CHAT_ID   = TG_BOT.includes(':') ? TG_BOT.split(':').slice(1).join(':') : (process.env.TG_CHAT_ID || '');
+const TG_BOT_TOKEN = process.env.TG_BOT_TOKEN;
+const TG_CHAT_ID = process.env.TG_CHAT_ID;
 const GITHUB_EVENT_NAME = process.env.GITHUB_EVENT_NAME || '';
 
 // Anti-detection: scheduled runs get 0-3h random delay; manual runs skip delay
