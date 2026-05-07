@@ -192,9 +192,28 @@ def check_token(sb) -> bool:
 
 def turnstile_exists(sb) -> bool:
     try:
-        return sb.execute_script(
+        # 先检测主页面
+        found = sb.execute_script(
             '(function(){ return document.querySelector(\'input[name="cf-turnstile-response"]\') !== null; })()'
         )
+        if found:
+            return True
+        # 再检测所有 iframe 内部 + Turnstile 特征 iframe
+        found = sb.execute_script("""
+(function(){
+  var iframes = document.querySelectorAll('iframe');
+  for (var i = 0; i < iframes.length; i++) {
+    try {
+      var doc = iframes[i].contentDocument || iframes[i].contentWindow.document;
+      if (doc && doc.querySelector('input[name="cf-turnstile-response"]')) return true;
+    } catch(e) {}
+    var src = iframes[i].src || '';
+    if (src.includes('challenges.cloudflare.com') || src.includes('turnstile')) return true;
+  }
+  return false;
+})()
+""")
+        return bool(found)
     except Exception:
         return False
 
@@ -333,7 +352,7 @@ def renew_account(idx: int, total: int, username: str, password: str, server_id:
             time.sleep(2)
 
             print(f"[-] {tag} 等待 Turnstile...")
-            for _ in range(40):
+            for _ in range(20):
                 if turnstile_exists(sb):
                     print(f"✅ {tag} 检测到 Turnstile")
                     break
